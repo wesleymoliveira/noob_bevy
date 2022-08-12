@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy::render::camera::ScalingMode;
+use bevy::render::{camera::ScalingMode, texture::ImageSettings};
 use bevy::window::PresentMode;
 
 pub const CLEAR: Color = Color::rgb(0.1, 0.1, 0.1);
@@ -9,6 +9,8 @@ fn main() {
     let height = 900.0;
 
     App::new()
+        //bevy 0.8 now uses linear texture filtering by default, but we can change it's global default for textures that requires unfiltered pixels(pixel art).
+        .insert_resource(ImageSettings::default_nearest())
         .insert_resource(ClearColor(CLEAR))
         .insert_resource(WindowDescriptor {
             title: "A Noob Bevy Game".to_string(),
