@@ -29,7 +29,7 @@ fn main() {
         .run();
 }
 
-//commands run at the end of the frame, it is the place to put things that need to be done every frame, like a queue of tasks
+//commands run at the end of the frame, it is the place to put things that need to be done every frame, like a queue of tasks - Commands are executed after the game update logic runs, but before rendering occurs (in CoreStage::Update in the ECS schedule) . So if you spawn something with a command, it will be rendered without any delay. But if you want to access the spawned components, you will either need to access them after the CoreStage::Update stage (for the current frame), or wait until next frame.
 fn spawn_camera(mut commands: Commands) {
     let mut camera = Camera2dBundle::default();
 
