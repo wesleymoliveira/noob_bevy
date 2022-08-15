@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-use crate::AsciiSpriteSheet;
+//use TILE_SIZE to adjust the movement to be relative to it
+use crate::{AsciiSpriteSheet, TILE_SIZE};
 
 pub struct PlayerPlugin;
 
@@ -28,16 +29,16 @@ fn player_movement(
     let (player, mut transform) = player_query.single_mut();
 
     if keyboard_input.pressed(KeyCode::W) {
-        transform.translation.y += time.delta_seconds() * player.speed;
+        transform.translation.y += time.delta_seconds() * TILE_SIZE * player.speed;
     }
     if keyboard_input.pressed(KeyCode::S) {
-        transform.translation.y -= time.delta_seconds() * player.speed;
+        transform.translation.y -= time.delta_seconds() * TILE_SIZE * player.speed;
     }
     if keyboard_input.pressed(KeyCode::A) {
-        transform.translation.x -= time.delta_seconds() * player.speed;
+        transform.translation.x -= time.delta_seconds() * TILE_SIZE * player.speed;
     }
     if keyboard_input.pressed(KeyCode::D) {
-        transform.translation.x += time.delta_seconds() * player.speed;
+        transform.translation.x += time.delta_seconds() * TILE_SIZE * player.speed;
     }
 }
 
@@ -50,7 +51,7 @@ fn spawn_player(
     let mut sprite = TextureAtlasSprite::new(1);
 
     sprite.color = Color::rgb(0.3, 0.3, 0.9);
-    sprite.custom_size = Some(Vec2::splat(1.0));
+    sprite.custom_size = Some(Vec2::splat(TILE_SIZE));
 
     //spawning a spritesheet bundle in the center and gives it a copy of atlas handle
     let player = commands
@@ -69,7 +70,7 @@ fn spawn_player(
 
     let mut background_sprite = TextureAtlasSprite::new(0);
     background_sprite.color = Color::rgb(0.5, 0.5, 0.5);
-    background_sprite.custom_size = Some(Vec2::splat(1.0));
+    background_sprite.custom_size = Some(Vec2::splat(TILE_SIZE));
 
     let background = commands
         .spawn_bundle(SpriteSheetBundle {
