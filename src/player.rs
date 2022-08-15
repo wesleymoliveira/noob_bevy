@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_inspector_egui::Inspectable;
 
 //use TILE_SIZE to adjust the movement to be relative to it
 use crate::{AsciiSpriteSheet, TILE_SIZE};
@@ -6,7 +7,7 @@ use crate::{AsciiSpriteSheet, TILE_SIZE};
 pub struct PlayerPlugin;
 
 //make the player a unique component to be able to access it from all the entities  in the game, not a simple texture atlas sprite
-#[derive(Component)]
+#[derive(Component, Inspectable)]
 pub struct Player {
     speed: f32,
 }

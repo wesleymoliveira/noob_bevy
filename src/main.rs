@@ -6,6 +6,9 @@ use bevy::window::PresentMode;
 mod player;
 use player::PlayerPlugin;
 
+mod debug;
+use debug::DebugPlugin;
+
 pub const CLEAR: Color = Color::rgb(0.1, 0.1, 0.1);
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const TILE_SIZE: f32 = 0.1;
@@ -31,6 +34,7 @@ fn main() {
         .add_startup_system_to_stage(StartupStage::PreStartup, load_ascii_sprite_sheet)
         .add_plugins(DefaultPlugins)
         .add_plugin(PlayerPlugin)
+        .add_plugin(DebugPlugin)
         .run();
 }
 
