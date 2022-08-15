@@ -10,7 +10,32 @@ pub struct Player;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(spawn_player);
+        app.add_startup_system(spawn_player)
+            .add_system(player_movement);
+    }
+}
+
+fn player_movement(
+    //used to move the player at a constant speed across different frame rates
+    time: Res<Time>,
+    keyboard_input: Res<Input<KeyCode>>,
+    //a query is a system fn param we use to look up groups of entities. On this situation we want to look up all the entities with the Player component
+    mut player_query: Query<(&Player, &mut Transform)>,
+) {
+    //as we have only one player it works fine, but if it returns more than one player, or zero we will have a problem
+    let (_player, mut transform) = player_query.single_mut();
+
+    if keyboard_input.pressed(KeyCode::W) {
+        transform.translation.y += time.delta_seconds() * 0.1;
+    }
+    if keyboard_input.pressed(KeyCode::S) {
+        transform.translation.y -= time.delta_seconds() * 0.1;
+    }
+    if keyboard_input.pressed(KeyCode::A) {
+        transform.translation.x -= time.delta_seconds() * 0.1;
+    }
+    if keyboard_input.pressed(KeyCode::D) {
+        transform.translation.x += time.delta_seconds() * 0.1;
     }
 }
 
