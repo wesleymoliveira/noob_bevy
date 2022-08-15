@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_field_names)]
 use bevy::prelude::*;
 use bevy::render::{camera::ScalingMode, texture::ImageSettings};
 use bevy::window::PresentMode;

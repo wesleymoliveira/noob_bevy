@@ -4,6 +4,10 @@ use crate::AsciiSpriteSheet;
 
 pub struct PlayerPlugin;
 
+//make the player a unique component to be able to access it from all the entities  in the game, not a simple texture atlas sprite
+#[derive(Component)]
+pub struct Player;
+
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(spawn_player);
@@ -33,6 +37,7 @@ fn spawn_player(
             ..Default::default()
         })
         .insert(Name::from("Player"))
+        .insert(Player)
         .id(); //id() gives back the entity after creation
 
     let mut background_sprite = TextureAtlasSprite::new(0);
