@@ -2,7 +2,10 @@ use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
 
 //use TILE_SIZE to adjust the movement to be relative to it
-use crate::{AsciiSpriteSheet, TILE_SIZE};
+use crate::{
+    ascii::{spawn_ascii_sprite, AsciiSpriteSheet},
+    TILE_SIZE,
+};
 
 pub struct PlayerPlugin;
 
@@ -48,41 +51,30 @@ fn spawn_player(
     mut commands: Commands,
     ascii: Res<AsciiSpriteSheet>,
 ) {
-    //sprite of a smile face
-    let mut sprite = TextureAtlasSprite::new(1);
+    let player = spawn_ascii_sprite(
+        &mut commands,
+        &ascii,
+        1,
+        Color::rgb(0.3, 0.3, 0.9),
+        Vec3::new(0.0, 0.0, 900.0),
+    );
 
-    sprite.color = Color::rgb(0.3, 0.3, 0.9);
-    sprite.custom_size = Some(Vec2::splat(TILE_SIZE));
-
-    //spawning a spritesheet bundle in the center and gives it a copy of atlas handle
-    let player = commands
-        .spawn_bundle(SpriteSheetBundle {
-            sprite,
-            texture_atlas: ascii.0.clone(),
-            transform: Transform {
-                translation: Vec3::new(0.0, 0.0, 900.0),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+    commands
+        .entity(player)
         .insert(Name::from("Player"))
         .insert(Player { speed: 3.0 })
         .id(); //id() gives back the entity after creation
 
-    let mut background_sprite = TextureAtlasSprite::new(0);
-    background_sprite.color = Color::rgb(0.5, 0.5, 0.5);
-    background_sprite.custom_size = Some(Vec2::splat(TILE_SIZE));
+    let background = spawn_ascii_sprite(
+        &mut commands,
+        &ascii,
+        0,
+        Color::rgb(0.5, 0.5, 0.5),
+        Vec3::new(0.0, 0.0, -1.0),
+    );
 
-    let background = commands
-        .spawn_bundle(SpriteSheetBundle {
-            sprite: background_sprite,
-            texture_atlas: ascii.0.clone(),
-            transform: Transform {
-                translation: Vec3::new(0.0, 0.0, -1.0),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+    commands
+        .entity(background)
         .insert(Name::new("Background"))
         .id(); //id() gives back the entity after creation
 
