@@ -6,7 +6,9 @@ pub struct PlayerPlugin;
 
 //make the player a unique component to be able to access it from all the entities  in the game, not a simple texture atlas sprite
 #[derive(Component)]
-pub struct Player;
+pub struct Player {
+    speed: f32,
+}
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
@@ -23,19 +25,19 @@ fn player_movement(
     mut player_query: Query<(&Player, &mut Transform)>,
 ) {
     //as we have only one player it works fine, but if it returns more than one player, or zero we will have a problem
-    let (_player, mut transform) = player_query.single_mut();
+    let (player, mut transform) = player_query.single_mut();
 
     if keyboard_input.pressed(KeyCode::W) {
-        transform.translation.y += time.delta_seconds() * 0.1;
+        transform.translation.y += time.delta_seconds() * player.speed;
     }
     if keyboard_input.pressed(KeyCode::S) {
-        transform.translation.y -= time.delta_seconds() * 0.1;
+        transform.translation.y -= time.delta_seconds() * player.speed;
     }
     if keyboard_input.pressed(KeyCode::A) {
-        transform.translation.x -= time.delta_seconds() * 0.1;
+        transform.translation.x -= time.delta_seconds() * player.speed;
     }
     if keyboard_input.pressed(KeyCode::D) {
-        transform.translation.x += time.delta_seconds() * 0.1;
+        transform.translation.x += time.delta_seconds() * player.speed;
     }
 }
 
@@ -62,7 +64,7 @@ fn spawn_player(
             ..Default::default()
         })
         .insert(Name::from("Player"))
-        .insert(Player)
+        .insert(Player { speed: 3.0 })
         .id(); //id() gives back the entity after creation
 
     let mut background_sprite = TextureAtlasSprite::new(0);
