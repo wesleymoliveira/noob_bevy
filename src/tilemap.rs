@@ -9,6 +9,9 @@ use crate::{
     TILE_SIZE,
 };
 
+#[derive(Component)]
+pub struct EncounterSpawner;
+
 pub struct TileMapPlugin;
 
 #[derive(Component)]
@@ -36,6 +39,10 @@ fn create_simple_map(mut commands: Commands, ascii: Res<AsciiSpriteSheet>) {
                 );
                 if char == '#' {
                     commands.entity(tile).insert(TileCollider);
+                }
+
+                if char == '~' {
+                    commands.entity(tile).insert(EncounterSpawner);
                 }
                 tiles.push(tile);
             }

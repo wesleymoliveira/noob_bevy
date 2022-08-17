@@ -19,10 +19,16 @@ pub const CLEAR: Color = Color::rgb(0.1, 0.1, 0.1);
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const TILE_SIZE: f32 = 0.1;
 
+#[derive(Debug, Clone, Eq, PartialEq, Copy, Hash)]
+pub enum GameState {
+    Overworld,
+    Battle,
+}
 fn main() {
     let height = 900.0;
 
     App::new()
+        .add_state(GameState::Overworld)
         //bevy 0.8 now uses linear texture filtering by default, but we can change it's global default for textures that requires unfiltered pixels(pixel art).
         .insert_resource(ImageSettings::default_nearest())
         .insert_resource(ClearColor(CLEAR))
