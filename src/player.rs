@@ -14,30 +14,79 @@ pub struct PlayerPlugin;
 #[derive(Component, Inspectable)]
 pub struct Player {
     speed: f32,
+    just_moved: bool,
 }
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(spawn_player).add_system_set(
-            SystemSet::on_update(GameState::Overworld)
-                .with_system(player_encounter_checking.after("movement"))
-                //labelling to enforce right sort avoiding camera jittering when the player is moving
-                .with_system(camera_follow.after("movement"))
-                .with_system(player_movement.label("movement")),
-        );
+        app.add_startup_system(spawn_player)
+            .add_system_set(SystemSet::on_enter(GameState::Overworld).with_system(show_player))
+            .add_system_set(SystemSet::on_exit(GameState::Overworld).with_system(hide_player))
+            .add_system_set(SystemSet::on_update(GameState::Battle).with_system(test_exit_battle))
+            .add_system_set(
+                SystemSet::on_update(GameState::Overworld)
+                    .with_system(player_encounter_checking.after("movement"))
+                    //labelling to enforce right sort avoiding camera jittering when the player is moving
+                    .with_system(camera_follow.after("movement"))
+                    .with_system(player_movement.label("movement")),
+            );
+    }
+}
+
+fn test_exit_battle(mut keyboard: ResMut<Input<KeyCode>>, mut state: ResMut<State<GameState>>) {
+    if keyboard.pressed(KeyCode::Escape) {
+        println!("Changing state to Overworld");
+        state.set(GameState::Overworld).unwrap();
+        keyboard.clear();
+    }
+}
+
+fn hide_player(
+    mut player_query: Query<&mut Visibility, With<Player>>,
+    children_query: Query<&Children, With<Player>>,
+    mut child_visibility_query: Query<&mut Visibility, Without<Player>>,
+) {
+    let mut player_vis = player_query.single_mut();
+    player_vis.is_visible = false;
+
+    if let Ok(children) = children_query.get_single() {
+        for child in children.iter() {
+            if let Ok(mut child_vis) = child_visibility_query.get_mut(*child) {
+                child_vis.is_visible = false;
+            }
+        }
+    }
+}
+
+fn show_player(
+    mut player_query: Query<&mut Visibility, With<Player>>,
+    children_query: Query<&Children, With<Player>>,
+    mut child_visibility_query: Query<&mut Visibility, Without<Player>>,
+) {
+    let mut player_vis = player_query.single_mut();
+    player_vis.is_visible = true;
+
+    if let Ok(children) = children_query.get_single() {
+        for child in children.iter() {
+            if let Ok(mut child_vis) = child_visibility_query.get_mut(*child) {
+                child_vis.is_visible = true;
+            }
+        }
     }
 }
 
 fn player_encounter_checking(
-    player_query: Query<&Transform, With<Player>>,
+    player_query: Query<(&Player, &Transform)>,
     encounter_query: Query<&Transform, (With<EncounterSpawner>, Without<Player>)>,
     mut state: ResMut<State<GameState>>,
 ) {
-    let player_translation = player_query.single().translation;
+    let (player, player_transform) = player_query.single();
+    let player_translation = player_transform.translation;
 
-    if encounter_query
-        .iter()
-        .any(|&transform| wall_collision_check(player_translation, transform.translation))
+    if player.just_moved
+        && encounter_query
+            .iter()
+            .any(|&transform| wall_collision_check(player_translation, transform.translation))
     {
         println!("Changing state to Battle");
         state
@@ -62,12 +111,13 @@ fn player_movement(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
     //a query is a system fn param we use to look up groups of entities. On this situation we want to look up all the entities with the Player component
-    mut player_query: Query<(&Player, &mut Transform)>,
+    mut player_query: Query<(&mut Player, &mut Transform)>,
     //query for tiles with colliders. The Player can have a collision with these tiles, then it could match two queries, it's the reason we are using Without<Player>
     wall_query: Query<&Transform, (With<TileCollider>, Without<Player>)>,
 ) {
     //as we have only one player it works fine, but if it returns more than one player, or zero we will have a problem
-    let (player, mut transform) = player_query.single_mut();
+    let (mut player, mut transform) = player_query.single_mut();
+    player.just_moved = false;
 
     let mut y_delta = 0.0;
 
@@ -93,6 +143,9 @@ fn player_movement(
         .iter()
         .any(|(&transform)| wall_collision_check(transform.translation, target))
     {
+        if x_delta != 0.0 {
+            player.just_moved = true;
+        }
         transform.translation = target;
     }
 
@@ -101,6 +154,9 @@ fn player_movement(
         .iter()
         .any(|(&transform)| wall_collision_check(transform.translation, target))
     {
+        if y_delta != 0.0 {
+            player.just_moved = true;
+        }
         transform.translation = target;
     }
 }
@@ -131,7 +187,10 @@ fn spawn_player(
     commands
         .entity(player)
         .insert(Name::from("Player"))
-        .insert(Player { speed: 3.0 });
+        .insert(Player {
+            speed: 3.0,
+            just_moved: false,
+        });
     //.id(); //id() gives back the entity after creation
 
     let background = spawn_ascii_sprite(
