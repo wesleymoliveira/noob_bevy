@@ -1,6 +1,7 @@
 #![allow(clippy::redundant_field_names)]
 use bevy::prelude::*;
 use bevy::render::{camera::ScalingMode, texture::ImageSettings};
+use bevy::time::*;
 use bevy::window::PresentMode;
 
 mod player;
@@ -42,6 +43,7 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
+        .add_plugin(TimePlugin)
         .add_startup_system(spawn_camera)
         .add_plugin(PlayerPlugin)
         .add_plugin(AsciiPlugin)

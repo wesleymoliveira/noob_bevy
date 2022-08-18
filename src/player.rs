@@ -10,6 +10,12 @@ use crate::{
 
 pub struct PlayerPlugin;
 
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
+pub struct EncounterTracker {
+    timer: Timer,
+}
+
 //make the player a unique component to be able to access it from all the entities  in the game, not a simple texture atlas sprite
 #[derive(Component, Inspectable)]
 pub struct Player {
@@ -76,11 +82,12 @@ fn show_player(
 }
 
 fn player_encounter_checking(
-    player_query: Query<(&Player, &Transform)>,
+    mut player_query: Query<(&Player, &mut EncounterTracker, &Transform)>,
     encounter_query: Query<&Transform, (With<EncounterSpawner>, Without<Player>)>,
     mut state: ResMut<State<GameState>>,
+    mut time: Res<Time>,
 ) {
-    let (player, player_transform) = player_query.single();
+    let (player, mut encounter_tracker, player_transform) = player_query.single_mut();
     let player_translation = player_transform.translation;
 
     if player.just_moved
@@ -88,10 +95,14 @@ fn player_encounter_checking(
             .iter()
             .any(|&transform| wall_collision_check(player_translation, transform.translation))
     {
-        println!("Changing state to Battle");
-        state
-            .set(GameState::Battle)
-            .expect("Failed to set game state to battle");
+        encounter_tracker.timer.tick(time.delta());
+
+        if encounter_tracker.timer.finished() {
+            println!("Changing state to Battle");
+            state
+                .set(GameState::Battle)
+                .expect("Failed to set game state to battle");
+        }
     }
 }
 
@@ -190,6 +201,9 @@ fn spawn_player(
         .insert(Player {
             speed: 3.0,
             just_moved: false,
+        })
+        .insert(EncounterTracker {
+            timer: Timer::from_seconds(2.0, true),
         });
     //.id(); //id() gives back the entity after creation
 
