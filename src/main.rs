@@ -5,6 +5,7 @@ use bevy::time::*;
 use bevy::window::PresentMode;
 
 mod player;
+use fadeout::FadeoutPlugin;
 use player::PlayerPlugin;
 
 mod debug;
@@ -15,6 +16,11 @@ use ascii::AsciiPlugin;
 
 mod tilemap;
 use tilemap::TileMapPlugin;
+
+mod battle;
+use battle::BattlePlugin;
+
+mod fadeout;
 
 pub const CLEAR: Color = Color::rgb(0.1, 0.1, 0.1);
 pub const RESOLUTION: f32 = 16.0 / 9.0;
@@ -46,6 +52,8 @@ fn main() {
         .add_plugin(TimePlugin)
         .add_startup_system(spawn_camera)
         .add_plugin(PlayerPlugin)
+        .add_plugin(BattlePlugin)
+        .add_plugin(FadeoutPlugin)
         .add_plugin(AsciiPlugin)
         .add_plugin(DebugPlugin)
         .add_plugin(TileMapPlugin)

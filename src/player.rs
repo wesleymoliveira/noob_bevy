@@ -4,6 +4,7 @@ use bevy_inspector_egui::Inspectable;
 //use TILE_SIZE to adjust the movement to be relative to it
 use crate::{
     ascii::{spawn_ascii_sprite, AsciiSpriteSheet},
+    fadeout::create_fadeout,
     tilemap::{EncounterSpawner, TileCollider},
     GameState, TILE_SIZE,
 };
@@ -20,6 +21,7 @@ pub struct EncounterTracker {
 #[derive(Component, Inspectable)]
 pub struct Player {
     speed: f32,
+    active: bool,
     just_moved: bool,
 }
 
@@ -28,7 +30,6 @@ impl Plugin for PlayerPlugin {
         app.add_startup_system(spawn_player)
             .add_system_set(SystemSet::on_enter(GameState::Overworld).with_system(show_player))
             .add_system_set(SystemSet::on_exit(GameState::Overworld).with_system(hide_player))
-            .add_system_set(SystemSet::on_update(GameState::Battle).with_system(test_exit_battle))
             .add_system_set(
                 SystemSet::on_update(GameState::Overworld)
                     .with_system(player_encounter_checking.after("movement"))
@@ -36,14 +37,6 @@ impl Plugin for PlayerPlugin {
                     .with_system(camera_follow.after("movement"))
                     .with_system(player_movement.label("movement")),
             );
-    }
-}
-
-fn test_exit_battle(mut keyboard: ResMut<Input<KeyCode>>, mut state: ResMut<State<GameState>>) {
-    if keyboard.pressed(KeyCode::Escape) {
-        println!("Changing state to Overworld");
-        state.set(GameState::Overworld).unwrap();
-        keyboard.clear();
     }
 }
 
@@ -65,11 +58,12 @@ fn hide_player(
 }
 
 fn show_player(
-    mut player_query: Query<&mut Visibility, With<Player>>,
+    mut player_query: Query<(&mut Player, &mut Visibility)>,
     children_query: Query<&Children, With<Player>>,
     mut child_visibility_query: Query<&mut Visibility, Without<Player>>,
 ) {
-    let mut player_vis = player_query.single_mut();
+    let (mut player, mut player_vis) = player_query.single_mut();
+    player.active = true;
     player_vis.is_visible = true;
 
     if let Ok(children) = children_query.get_single() {
@@ -82,12 +76,14 @@ fn show_player(
 }
 
 fn player_encounter_checking(
-    mut player_query: Query<(&Player, &mut EncounterTracker, &Transform)>,
+    mut commands: Commands,
+    mut player_query: Query<(&mut Player, &mut EncounterTracker, &Transform)>,
     encounter_query: Query<&Transform, (With<EncounterSpawner>, Without<Player>)>,
+    ascii: Res<AsciiSpriteSheet>,
     mut state: ResMut<State<GameState>>,
     mut time: Res<Time>,
 ) {
-    let (player, mut encounter_tracker, player_transform) = player_query.single_mut();
+    let (mut player, mut encounter_tracker, player_transform) = player_query.single_mut();
     let player_translation = player_transform.translation;
 
     if player.just_moved
@@ -99,9 +95,8 @@ fn player_encounter_checking(
 
         if encounter_tracker.timer.finished() {
             println!("Changing state to Battle");
-            state
-                .set(GameState::Battle)
-                .expect("Failed to set game state to battle");
+            player.active = false;
+            create_fadeout(&mut commands, GameState::Battle, &ascii);
         }
     }
 }
@@ -129,6 +124,10 @@ fn player_movement(
     //as we have only one player it works fine, but if it returns more than one player, or zero we will have a problem
     let (mut player, mut transform) = player_query.single_mut();
     player.just_moved = false;
+
+    if !player.active {
+        return;
+    }
 
     let mut y_delta = 0.0;
 
@@ -200,6 +199,7 @@ fn spawn_player(
         .insert(Name::from("Player"))
         .insert(Player {
             speed: 3.0,
+            active: true,
             just_moved: false,
         })
         .insert(EncounterTracker {
