@@ -4,6 +4,7 @@ use bevy_inspector_egui::Inspectable;
 //use TILE_SIZE to adjust the movement to be relative to it
 use crate::{
     ascii::{spawn_ascii_sprite, AsciiSpriteSheet},
+    battle::BattleStats,
     fadeout::create_fadeout,
     tilemap::{EncounterSpawner, TileCollider},
     GameState, TILE_SIZE,
@@ -201,6 +202,12 @@ fn spawn_player(
             speed: 3.0,
             active: true,
             just_moved: false,
+        })
+        .insert(BattleStats {
+            health: 10,
+            max_health: 10,
+            attack: 2,
+            defense: 1,
         })
         .insert(EncounterTracker {
             timer: Timer::from_seconds(2.0, true),

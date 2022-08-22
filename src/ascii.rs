@@ -4,6 +4,9 @@ use crate::TILE_SIZE;
 
 pub struct AsciiPlugin;
 
+#[derive(Component)]
+pub struct AsciiText;
+
 //for ease of use, I created my own resource wich will hold a copy of the handle. I t turns things ease for any system in the game to get its hands on this specific handle and to spawn a sprite from it
 pub struct AsciiSpriteSheet(pub Handle<TextureAtlas>);
 
@@ -11,6 +14,43 @@ impl Plugin for AsciiPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system_to_stage(StartupStage::PreStartup, load_ascii_sprite_sheet);
     }
+}
+
+pub fn spawn_ascii_text(
+    commands: &mut Commands,
+    ascii: &AsciiSpriteSheet,
+    to_print: &str,
+    left_center: Vec3,
+) -> Entity {
+    let color = Color::rgb(0.8, 0.8, 0.8);
+    let mut character_sprites = Vec::new();
+    for (i, char) in to_print.chars().enumerate() {
+        //https://doc.rust-lang.org/std/primitive.char.html#representation
+        //char is always 4 bytes, spritesheet only has 256 images
+        assert!(i < 256, "Index out of Ascii Range");
+
+        character_sprites.push(spawn_ascii_sprite(
+            commands,
+            ascii,
+            char as usize,
+            color,
+            Vec3 {
+                x: i as f32 * TILE_SIZE,
+                y: 0.0,
+                z: 0.0,
+            },
+        ))
+    }
+    commands
+        .spawn_bundle(SpatialBundle::default())
+        .insert(Transform {
+            translation: left_center,
+            ..Default::default()
+        })
+        .insert(Name::new(format!("Text - {}", to_print)))
+        .push_children(&character_sprites)
+        .insert(AsciiText)
+        .id()
 }
 
 pub fn spawn_ascii_sprite(
