@@ -2,20 +2,30 @@ use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
 
 use crate::{
-    ascii::{spawn_ascii_sprite, spawn_ascii_text, AsciiSpriteSheet, AsciiText},
+    ascii::{
+        spawn_ascii_sprite, spawn_ascii_text, spawn_nine_slice, AsciiSpriteSheet, AsciiText,
+        NineSlice, NineSliceIndices,
+    },
     fadeout::create_fadeout,
     player::Player,
-    GameState, TILE_SIZE,
+    GameState, RESOLUTION, TILE_SIZE,
 };
 
 #[derive(Component)]
 pub struct Enemy;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+pub enum BattleState {
+    PlayerTurn,
+    EnemyTurn(bool),
+    Exiting,
+}
 pub struct BattlePlugin;
 
 pub struct FightEvent {
     target: Entity,
     damage_amount: isize,
+    next_state: BattleState,
 }
 
 #[derive(Component, Inspectable)]
@@ -29,15 +39,132 @@ pub struct BattleStats {
 impl Plugin for BattlePlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<FightEvent>()
+            .add_state(BattleState::PlayerTurn)
+            .insert_resource(BattleMenuSelection {
+                selected: BattleMenuOption::Fight,
+            })
+            .add_system_set(
+                SystemSet::on_update(BattleState::EnemyTurn(false)).with_system(process_enemy_turn),
+            )
             .add_system_set(
                 SystemSet::on_update(GameState::Battle)
-                    .with_system(test_exit_battle)
                     .with_system(battle_input)
-                    .with_system(damage_calculation)
-                    .with_system(battle_camera),
+                    .with_system(battle_camera)
+                    .with_system(highlight_battle_buttons)
+                    .with_system(damage_calculation),
             )
-            .add_system_set(SystemSet::on_enter(GameState::Battle).with_system(spawn_enemy))
-            .add_system_set(SystemSet::on_exit(GameState::Battle).with_system(despawn_enemy));
+            .add_system_set(
+                SystemSet::on_enter(GameState::Battle)
+                    .with_system(set_starting_state)
+                    .with_system(spawn_enemy)
+                    .with_system(spawn_battle_menu),
+            )
+            .add_system_set(
+                SystemSet::on_exit(GameState::Battle)
+                    .with_system(despawn_enemy)
+                    .with_system(despawn_menu),
+            );
+    }
+}
+
+fn set_starting_state(mut state: ResMut<State<BattleState>>) {
+    let _ = state.set(BattleState::PlayerTurn);
+}
+
+const NUM_MENU_OPTIONS: isize = 2;
+#[derive(Component, PartialEq, Clone, Copy)]
+pub enum BattleMenuOption {
+    Fight,
+    Run,
+}
+
+pub struct BattleMenuSelection {
+    selected: BattleMenuOption,
+}
+
+fn spawn_battle_button(
+    commands: &mut Commands,
+    ascii: &AsciiSpriteSheet,
+    indices: &NineSliceIndices,
+    translation: Vec3,
+    text: &str,
+    id: BattleMenuOption,
+    size: Vec2,
+) -> Entity {
+    let fight_nine_slice = spawn_nine_slice(commands, ascii, indices, size.x, size.y);
+
+    let x_offset = (-size.x / 2.0 + 1.5) * TILE_SIZE;
+    let fight_text = spawn_ascii_text(commands, ascii, text, Vec3::new(x_offset, 0.0, 0.0));
+
+    commands
+        .spawn_bundle(SpatialBundle::default())
+        .insert(Transform {
+            translation: translation,
+            ..Default::default()
+        })
+        .insert(Name::new("Button"))
+        .insert(id)
+        .add_child(fight_text)
+        .add_child(fight_nine_slice)
+        .id()
+}
+
+fn spawn_battle_menu(
+    mut commands: Commands,
+    ascii: Res<AsciiSpriteSheet>,
+    nine_slice_indices: Res<NineSliceIndices>,
+) {
+    let box_height = 3.0;
+    let box_center_y = -1.0 + box_height * TILE_SIZE / 2.0;
+
+    let run_text = "Run";
+    let run_width = (run_text.len() + 2) as f32;
+    let run_center_x = RESOLUTION - (run_width * TILE_SIZE) / 2.0;
+
+    spawn_battle_button(
+        &mut commands,
+        &ascii,
+        &nine_slice_indices,
+        Vec3::new(run_center_x, box_center_y, 100.0),
+        run_text,
+        BattleMenuOption::Run,
+        Vec2::new(run_width, box_height),
+    );
+
+    let fight_text = "Fight";
+    let fight_width = (fight_text.len() + 2) as f32;
+    let fight_center_x = RESOLUTION - (run_width * TILE_SIZE) - (fight_width * TILE_SIZE / 2.0);
+
+    spawn_battle_button(
+        &mut commands,
+        &ascii,
+        &nine_slice_indices,
+        Vec3::new(fight_center_x, box_center_y, 100.0),
+        fight_text,
+        BattleMenuOption::Fight,
+        Vec2::new(fight_width, box_height),
+    );
+}
+
+fn process_enemy_turn(
+    mut fight_event: EventWriter<FightEvent>,
+    mut battle_state: ResMut<State<BattleState>>,
+    enemy_query: Query<&BattleStats, With<Enemy>>,
+    player_query: Query<Entity, With<Player>>,
+) {
+    let player_ent = player_query.single();
+    let enemy_stats = enemy_query.iter().next().unwrap();
+    fight_event.send(FightEvent {
+        target: player_ent,
+        damage_amount: enemy_stats.attack,
+        next_state: BattleState::PlayerTurn,
+    });
+    battle_state.set(BattleState::EnemyTurn(true)).unwrap();
+}
+
+fn despawn_menu(mut commands: Commands, button_query: Query<Entity, With<BattleMenuOption>>) {
+    for button in button_query.iter() {
+        commands.entity(button).despawn_recursive();
     }
 }
 
@@ -47,14 +174,17 @@ fn damage_calculation(
     mut fight_event: EventReader<FightEvent>,
     text_query: Query<&AsciiText>,
     mut target_query: Query<(&Children, &mut BattleStats)>,
+    mut battle_state: ResMut<State<BattleState>>,
 ) {
-    for event in fight_event.iter() {
-        let (target_children, mut target_stats) = target_query
-            .get_mut(event.target)
-            .expect("Fight target with stats not found");
+    if let Some(fight_event) = fight_event.iter().next() {
+        //Get target stats and children
+        let (target_children, mut stats) = target_query
+            .get_mut(fight_event.target)
+            .expect("Fighting enemy without stats");
 
-        target_stats.health = std::cmp::max(
-            target_stats.health - event.damage_amount - target_stats.defense,
+        //Damage calc
+        stats.health = std::cmp::max(
+            stats.health - (fight_event.damage_amount - stats.defense),
             0,
         );
 
@@ -68,37 +198,73 @@ fn damage_calculation(
                 let new_health = spawn_ascii_text(
                     &mut commands,
                     &ascii,
-                    &format!("Health: {}", target_stats.health as usize),
+                    &format!("Health: {}", stats.health as usize),
                     //relative to enemy pos
                     Vec3::new(-4.5 * TILE_SIZE, 2.0 * TILE_SIZE, 100.0),
                 );
 
-                commands.entity(event.target).add_child(new_health);
+                commands.entity(fight_event.target).add_child(new_health);
             }
         }
 
-        if target_stats.health == 0 {
+        //Kill enemy if dead
+        //TODO support multiple enemies
+        //FIXME should create fadeout!
+        if stats.health == 0 {
             create_fadeout(&mut commands, GameState::Overworld, &ascii);
-            /*  commands.despawn(event.target); */
+            battle_state.set(BattleState::Exiting).unwrap();
+        } else {
+            battle_state.set(fight_event.next_state).unwrap();
         }
     }
 }
 
 fn battle_input(
-    keyboard: ResMut<Input<KeyCode>>,
-    mut fight_event: EventWriter<FightEvent>,
+    mut commands: Commands,
+    keyboard: Res<Input<KeyCode>>,
     player_query: Query<&BattleStats, With<Player>>,
     enemy_query: Query<Entity, With<Enemy>>,
+    mut fight_event: EventWriter<FightEvent>,
+    mut menu_state: ResMut<BattleMenuSelection>,
+    mut battle_state: ResMut<State<BattleState>>,
+    ascii: Res<AsciiSpriteSheet>,
 ) {
-    let player_stats = player_query.single();
-    //todo handle multiple enemies and enemy selection
+    if battle_state.current() != &BattleState::PlayerTurn {
+        return;
+    }
 
-    let target = enemy_query.iter().next().unwrap();
-    if keyboard.just_pressed(KeyCode::Return) {
-        fight_event.send(FightEvent {
-            target,
-            damage_amount: player_stats.attack,
-        });
+    let player_battle = player_query.single();
+
+    //TODO handle multiple enemies
+    let enemy = enemy_query.single();
+    let mut new_selection = menu_state.selected as isize;
+    if keyboard.just_pressed(KeyCode::A) {
+        new_selection -= 1;
+    }
+    if keyboard.just_pressed(KeyCode::D) {
+        new_selection += 1;
+    }
+    new_selection = (new_selection + NUM_MENU_OPTIONS) % NUM_MENU_OPTIONS;
+
+    menu_state.selected = match new_selection {
+        0 => BattleMenuOption::Fight,
+        1 => BattleMenuOption::Run,
+        _ => unreachable!("Bad menu selection"),
+    };
+
+    if keyboard.just_pressed(KeyCode::Space) {
+        match menu_state.selected {
+            BattleMenuOption::Fight => fight_event.send(FightEvent {
+                //TODO select enemy and attack type
+                target: enemy,
+                damage_amount: player_battle.attack,
+                next_state: BattleState::EnemyTurn(false),
+            }),
+            BattleMenuOption::Run => {
+                create_fadeout(&mut commands, GameState::Overworld, &ascii);
+                battle_state.set(BattleState::Exiting).unwrap()
+            }
+        }
     }
 }
 
@@ -123,6 +289,7 @@ fn spawn_enemy(mut commands: Commands, ascii: Res<AsciiSpriteSheet>) {
         'b' as usize,
         Color::rgb(0.8, 0.8, 0.8),
         Vec3::new(0.0, 0.5, 100.0),
+        Vec3::splat(1.0),
     );
     commands
         .entity(sprite)
@@ -144,12 +311,25 @@ fn despawn_enemy(mut commands: Commands, enemy_query: Query<Entity, With<Enemy>>
     }
 }
 
-fn test_exit_battle(
-    mut commands: Commands,
-    keyboard: ResMut<Input<KeyCode>>,
-    ascii: Res<AsciiSpriteSheet>,
+fn highlight_battle_buttons(
+    menu_state: Res<BattleMenuSelection>,
+    button_query: Query<(&Children, &BattleMenuOption)>,
+    nine_slice_query: Query<&Children, With<NineSlice>>,
+    mut sprites_query: Query<&mut TextureAtlasSprite>,
 ) {
-    if keyboard.just_pressed(KeyCode::Escape) {
-        create_fadeout(&mut commands, GameState::Overworld, &ascii);
+    for (button_children, button_id) in button_query.iter() {
+        for button_child in button_children.iter() {
+            if let Ok(nine_slice_children) = nine_slice_query.get(*button_child) {
+                for nine_slice_child in nine_slice_children.iter() {
+                    if let Ok(mut sprite) = sprites_query.get_mut(*nine_slice_child) {
+                        if menu_state.selected == *button_id {
+                            sprite.color = Color::RED;
+                        } else {
+                            sprite.color = Color::WHITE;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
