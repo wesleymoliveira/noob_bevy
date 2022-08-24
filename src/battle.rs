@@ -19,6 +19,7 @@ pub enum BattleState {
     PlayerTurn,
     EnemyTurn(bool),
     Exiting,
+    Reward,
 }
 pub struct BattlePlugin;
 

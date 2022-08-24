@@ -17,5 +17,16 @@ opt-level = 3
 
 [dependencies]
 # Dynamic linking for faster compile-times
-bevy = { version = "0.8.0", features = ["dynamic"] }
+bevy = { version = "0.8.0", default-features = false, features = [
+  "dynamic",
+  "animation",
+  "bevy_asset",
+  "bevy_scene",
+  "bevy_winit",
+  "render",
+  "png",
+  "x11",
+  "filesystem_watcher",
+] }
 bevy-inspector-egui = "0.12.1"
+bevy_kira_audio = { version = "0.12.0", features = ["ogg", "wav"] }
