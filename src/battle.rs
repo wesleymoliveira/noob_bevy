@@ -17,9 +17,18 @@ pub struct Enemy;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum BattleState {
     PlayerTurn,
+    PlayerAttack,
     EnemyTurn(bool),
+    EnemyAttack,
     Exiting,
     Reward,
+}
+
+pub struct AttackEffects {
+    timer: Timer,
+    flash_speed: f32,
+    screen_shake_amount: f32,
+    current_shake: f32,
 }
 pub struct BattlePlugin;
 
@@ -41,6 +50,12 @@ impl Plugin for BattlePlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<FightEvent>()
             .add_state(BattleState::PlayerTurn)
+            .insert_resource(AttackEffects {
+                timer: Timer::from_seconds(0.7, true),
+                flash_speed: 0.1,
+                current_shake: 0.0,
+                screen_shake_amount: 0.1,
+            })
             .insert_resource(BattleMenuSelection {
                 selected: BattleMenuOption::Fight,
             })
@@ -64,7 +79,43 @@ impl Plugin for BattlePlugin {
                 SystemSet::on_exit(GameState::Battle)
                     .with_system(despawn_enemy)
                     .with_system(despawn_menu),
+            )
+            .add_system_set(
+                SystemSet::on_update(BattleState::PlayerAttack).with_system(handle_attack_effects),
+            )
+            .add_system_set(
+                SystemSet::on_update(BattleState::EnemyAttack).with_system(handle_attack_effects),
             );
+    }
+}
+
+fn handle_attack_effects(
+    mut attack_fx: ResMut<AttackEffects>,
+    time: Res<Time>,
+    mut enemy_graphics_query: Query<&mut Visibility, With<Enemy>>,
+    mut state: ResMut<State<BattleState>>,
+) {
+    attack_fx.timer.tick(time.delta());
+    let mut enemy_sprite = enemy_graphics_query.iter_mut().next().unwrap();
+
+    if state.current() == &BattleState::PlayerAttack {
+        if attack_fx.timer.elapsed_secs() % attack_fx.flash_speed > attack_fx.flash_speed / 2.0 {
+            enemy_sprite.is_visible = false;
+        } else {
+            enemy_sprite.is_visible = true;
+        }
+    } else {
+        attack_fx.current_shake = attack_fx.screen_shake_amount
+            * f32::sin(attack_fx.timer.percent() * 2.0 * std::f32::consts::PI);
+    }
+
+    if attack_fx.timer.just_finished() {
+        enemy_sprite.is_visible = true;
+        if state.current() == &BattleState::PlayerAttack {
+            state.set(BattleState::EnemyTurn(false)).unwrap();
+        } else {
+            state.set(BattleState::PlayerTurn).unwrap();
+        }
     }
 }
 
@@ -158,7 +209,7 @@ fn process_enemy_turn(
     fight_event.send(FightEvent {
         target: player_ent,
         damage_amount: enemy_stats.attack,
-        next_state: BattleState::PlayerTurn,
+        next_state: BattleState::EnemyAttack,
     });
     battle_state.set(BattleState::EnemyTurn(true)).unwrap();
 }
@@ -259,7 +310,7 @@ fn battle_input(
                 //TODO select enemy and attack type
                 target: enemy,
                 damage_amount: player_battle.attack,
-                next_state: BattleState::EnemyTurn(false),
+                next_state: BattleState::PlayerAttack,
             }),
             BattleMenuOption::Run => {
                 create_fadeout(&mut commands, GameState::Overworld, &ascii);
@@ -269,9 +320,12 @@ fn battle_input(
     }
 }
 
-fn battle_camera(mut camera_query: Query<&mut Transform, With<Camera>>) {
+fn battle_camera(
+    mut camera_query: Query<&mut Transform, With<Camera>>,
+    attack_fx: Res<AttackEffects>,
+) {
     let mut camera_transform = camera_query.single_mut();
-    camera_transform.translation.x = 0.0;
+    camera_transform.translation.x = attack_fx.current_shake;
     camera_transform.translation.y = 0.0;
 }
 

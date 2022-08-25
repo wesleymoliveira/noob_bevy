@@ -95,7 +95,6 @@ fn player_encounter_checking(
         encounter_tracker.timer.tick(time.delta());
 
         if encounter_tracker.timer.finished() {
-            println!("Changing state to Battle");
             player.active = false;
             create_fadeout(&mut commands, GameState::Battle, &ascii);
         }
