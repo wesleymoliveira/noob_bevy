@@ -24,6 +24,7 @@ pub struct Player {
     speed: f32,
     active: bool,
     just_moved: bool,
+    pub exp: usize,
 }
 
 impl Plugin for PlayerPlugin {
@@ -202,6 +203,7 @@ fn spawn_player(
             speed: 3.0,
             active: true,
             just_moved: false,
+            exp: 0,
         })
         .insert(BattleStats {
             health: 10,

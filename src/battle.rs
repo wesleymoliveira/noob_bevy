@@ -3,8 +3,8 @@ use bevy_inspector_egui::Inspectable;
 
 use crate::{
     ascii::{
-        spawn_ascii_sprite, spawn_ascii_text, spawn_nine_slice, AsciiSpriteSheet, AsciiText,
-        NineSlice, NineSliceIndices,
+        spawn_ascii_sprite, spawn_ascii_text, spawn_nine_slice, AsciiSpriteSheet, NineSlice,
+        NineSliceIndices,
     },
     fadeout::create_fadeout,
     player::Player,
@@ -30,6 +30,9 @@ pub struct AttackEffects {
     screen_shake_amount: f32,
     current_shake: f32,
 }
+
+#[derive(Component)]
+pub struct BattleText;
 pub struct BattlePlugin;
 
 pub struct FightEvent {
@@ -53,8 +56,8 @@ impl Plugin for BattlePlugin {
             .insert_resource(AttackEffects {
                 timer: Timer::from_seconds(0.7, true),
                 flash_speed: 0.1,
-                current_shake: 0.0,
                 screen_shake_amount: 0.1,
+                current_shake: 0.0,
             })
             .insert_resource(BattleMenuSelection {
                 selected: BattleMenuOption::Fight,
@@ -73,19 +76,56 @@ impl Plugin for BattlePlugin {
                 SystemSet::on_enter(GameState::Battle)
                     .with_system(set_starting_state)
                     .with_system(spawn_enemy)
+                    .with_system(spawn_player_health)
                     .with_system(spawn_battle_menu),
             )
             .add_system_set(
                 SystemSet::on_exit(GameState::Battle)
-                    .with_system(despawn_enemy)
-                    .with_system(despawn_menu),
+                    .with_system(despawn_all_battle_text)
+                    .with_system(despawn_menu)
+                    .with_system(despawn_enemy),
             )
             .add_system_set(
                 SystemSet::on_update(BattleState::PlayerAttack).with_system(handle_attack_effects),
             )
             .add_system_set(
+                SystemSet::on_enter(BattleState::Reward)
+                    .with_system(give_reward)
+                    .with_system(despawn_enemy),
+            )
+            .add_system_set(
+                SystemSet::on_update(BattleState::Reward).with_system(handle_accepting_reward),
+            )
+            .add_system_set(
                 SystemSet::on_update(BattleState::EnemyAttack).with_system(handle_attack_effects),
             );
+    }
+}
+
+fn spawn_player_health(
+    mut commands: Commands,
+    ascii: Res<AsciiSpriteSheet>,
+    mut player_query: Query<(Entity, &BattleStats, &Transform, &mut Visibility), With<Player>>,
+) {
+    let (player, stats, transform, mut visibility) = player_query.single_mut();
+
+    let health_text = format!("Health: {}", stats.health);
+    let text = spawn_ascii_text(
+        &mut commands,
+        &ascii,
+        &health_text,
+        Vec3::new(-RESOLUTION + TILE_SIZE, -1.0 + TILE_SIZE, 0.0) - transform.translation,
+    );
+
+    visibility.is_visible = true;
+
+    commands.entity(text).insert(BattleText);
+    commands.entity(player).add_child(text);
+}
+
+fn despawn_all_battle_text(mut commands: Commands, text_query: Query<Entity, With<BattleText>>) {
+    for entity in text_query.iter() {
+        commands.entity(entity).despawn_recursive();
     }
 }
 
@@ -220,11 +260,41 @@ fn despawn_menu(mut commands: Commands, button_query: Query<Entity, With<BattleM
     }
 }
 
+fn handle_accepting_reward(
+    mut commands: Commands,
+    ascii: Res<AsciiSpriteSheet>,
+    keyboard: Res<Input<KeyCode>>,
+) {
+    if keyboard.just_pressed(KeyCode::Space) {
+        create_fadeout(&mut commands, GameState::Overworld, &ascii);
+    }
+}
+
+fn give_reward(
+    mut commands: Commands,
+    ascii: Res<AsciiSpriteSheet>,
+    mut player_query: Query<&mut Player>,
+    mut keyboard: ResMut<Input<KeyCode>>,
+) {
+    keyboard.clear();
+    //TODO come based on enemies killed
+    let exp_reward = 10;
+    let reward_text = format!("Earned: {} exp", exp_reward);
+    let text = spawn_ascii_text(
+        &mut commands,
+        &ascii,
+        &reward_text,
+        Vec3::new(-((reward_text.len() / 2) as f32 * TILE_SIZE), 0.0, 0.0),
+    );
+    commands.entity(text).insert(BattleText);
+    player_query.single_mut().exp += exp_reward;
+}
+
 fn damage_calculation(
     mut commands: Commands,
     ascii: Res<AsciiSpriteSheet>,
     mut fight_event: EventReader<FightEvent>,
-    text_query: Query<&AsciiText>,
+    text_query: Query<&Transform, With<BattleText>>,
     mut target_query: Query<(&Children, &mut BattleStats)>,
     mut battle_state: ResMut<State<BattleState>>,
 ) {
@@ -243,7 +313,7 @@ fn damage_calculation(
         //Update health
         for child in target_children.iter() {
             //See if this child is the health text
-            if text_query.get(*child).is_ok() {
+            if let Ok(transform) = text_query.get(*child) {
                 //Delete old text
                 commands.entity(*child).despawn_recursive();
                 //Create new text
@@ -252,19 +322,18 @@ fn damage_calculation(
                     &ascii,
                     &format!("Health: {}", stats.health as usize),
                     //relative to enemy pos
-                    Vec3::new(-4.5 * TILE_SIZE, 2.0 * TILE_SIZE, 100.0),
+                    transform.translation,
                 );
-
+                commands.entity(new_health).insert(BattleText);
                 commands.entity(fight_event.target).add_child(new_health);
             }
         }
 
         //Kill enemy if dead
         //TODO support multiple enemies
-        //FIXME should create fadeout!
         if stats.health == 0 {
             create_fadeout(&mut commands, GameState::Overworld, &ascii);
-            battle_state.set(BattleState::Exiting).unwrap();
+            battle_state.set(BattleState::Reward).unwrap();
         } else {
             battle_state.set(fight_event.next_state).unwrap();
         }
@@ -338,6 +407,9 @@ fn spawn_enemy(mut commands: Commands, ascii: Res<AsciiSpriteSheet>) {
         //relative to enemy pos
         Vec3::new(-4.5 * TILE_SIZE, 2.0 * TILE_SIZE, 100.0),
     );
+
+    commands.entity(health_text).insert(BattleText);
+
     let sprite = spawn_ascii_sprite(
         &mut commands,
         &ascii,
