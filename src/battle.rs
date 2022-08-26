@@ -2,11 +2,9 @@ use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
 
 use crate::{
-    ascii::{
-        spawn_ascii_sprite, spawn_ascii_text, spawn_nine_slice, AsciiSpriteSheet, NineSlice,
-        NineSliceIndices,
-    },
+    ascii::{spawn_ascii_text, spawn_nine_slice, AsciiSpriteSheet, NineSlice, NineSliceIndices},
     fadeout::create_fadeout,
+    graphics::{spawn_bat_sprite, CharacterSheet},
     player::Player,
     GameState, RESOLUTION, TILE_SIZE,
 };
@@ -94,7 +92,9 @@ impl Plugin for BattlePlugin {
                     .with_system(despawn_enemy),
             )
             .add_system_set(
-                SystemSet::on_update(BattleState::Reward).with_system(handle_accepting_reward),
+                SystemSet::on_update(BattleState::Reward)
+                    .with_system(handle_accepting_reward)
+                    .with_system(despawn_enemy),
             )
             .add_system_set(
                 SystemSet::on_update(BattleState::EnemyAttack).with_system(handle_attack_effects),
@@ -398,26 +398,23 @@ fn battle_camera(
     camera_transform.translation.y = 0.0;
 }
 
-fn spawn_enemy(mut commands: Commands, ascii: Res<AsciiSpriteSheet>) {
+fn spawn_enemy(
+    mut commands: Commands,
+    ascii: Res<AsciiSpriteSheet>,
+    characters: Res<CharacterSheet>,
+) {
     let enemy_health = 3;
     let health_text = spawn_ascii_text(
         &mut commands,
         &ascii,
         &format!("Health: {}", enemy_health as usize),
         //relative to enemy pos
-        Vec3::new(-4.5 * TILE_SIZE, 2.0 * TILE_SIZE, 100.0),
+        Vec3::new(-4.5 * TILE_SIZE, 4.0 * TILE_SIZE, 100.0),
     );
 
     commands.entity(health_text).insert(BattleText);
 
-    let sprite = spawn_ascii_sprite(
-        &mut commands,
-        &ascii,
-        'b' as usize,
-        Color::rgb(0.8, 0.8, 0.8),
-        Vec3::new(0.0, 0.5, 100.0),
-        Vec3::splat(1.0),
-    );
+    let sprite = spawn_bat_sprite(&mut commands, &characters, Vec3::new(0.0, 0.2, 100.0));
     commands
         .entity(sprite)
         .insert(Enemy)
