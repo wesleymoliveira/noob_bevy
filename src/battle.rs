@@ -6,7 +6,7 @@ use crate::{
     fadeout::create_fadeout,
     graphics::{spawn_bat_sprite, CharacterSheet},
     player::Player,
-    GameState, RESOLUTION, TILE_SIZE,
+    GameState, MainCamera, RESOLUTION, TILE_SIZE,
 };
 
 #[derive(Component)]
@@ -264,9 +264,11 @@ fn handle_accepting_reward(
     mut commands: Commands,
     ascii: Res<AsciiSpriteSheet>,
     keyboard: Res<Input<KeyCode>>,
+    mut battle_state: ResMut<State<BattleState>>,
 ) {
     if keyboard.just_pressed(KeyCode::Space) {
-        create_fadeout(&mut commands, GameState::Overworld, &ascii);
+        battle_state.set(BattleState::Exiting).unwrap();
+        create_fadeout(&mut commands, None, &ascii);
     }
 }
 
@@ -332,7 +334,6 @@ fn damage_calculation(
         //Kill enemy if dead
         //TODO support multiple enemies
         if stats.health == 0 {
-            create_fadeout(&mut commands, GameState::Overworld, &ascii);
             battle_state.set(BattleState::Reward).unwrap();
         } else {
             battle_state.set(fight_event.next_state).unwrap();
@@ -382,7 +383,7 @@ fn battle_input(
                 next_state: BattleState::PlayerAttack,
             }),
             BattleMenuOption::Run => {
-                create_fadeout(&mut commands, GameState::Overworld, &ascii);
+                create_fadeout(&mut commands, None, &ascii);
                 battle_state.set(BattleState::Exiting).unwrap()
             }
         }
@@ -390,7 +391,7 @@ fn battle_input(
 }
 
 fn battle_camera(
-    mut camera_query: Query<&mut Transform, With<Camera>>,
+    mut camera_query: Query<&mut Transform, With<MainCamera>>,
     attack_fx: Res<AttackEffects>,
 ) {
     let mut camera_transform = camera_query.single_mut();

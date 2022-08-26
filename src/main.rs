@@ -28,6 +28,9 @@ use audio::GameAudioPlugin;
 mod graphics;
 use graphics::GraphicsPlugin;
 
+mod start_menu;
+use start_menu::MainMenuPlugin;
+
 pub const CLEAR: Color = Color::rgb(0.1, 0.1, 0.1);
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const TILE_SIZE: f32 = 0.1;
@@ -36,12 +39,14 @@ pub const TILE_SIZE: f32 = 0.1;
 pub enum GameState {
     Overworld,
     Battle,
+    StartMenu,
 }
+
 fn main() {
     let height = 900.0;
 
     App::new()
-        .add_state(GameState::Overworld)
+        .add_state(GameState::StartMenu)
         //bevy 0.8 now uses linear texture filtering by default, but we can change it's global default for textures that requires unfiltered pixels(pixel art).
         .insert_resource(ImageSettings::default_nearest())
         .insert_resource(ClearColor(CLEAR))
@@ -64,9 +69,13 @@ fn main() {
         .add_plugin(FadeoutPlugin)
         .add_plugin(AsciiPlugin)
         .add_plugin(DebugPlugin)
+        .add_plugin(MainMenuPlugin)
         .add_plugin(TileMapPlugin)
         .run();
 }
+
+#[derive(Component)]
+pub struct MainCamera;
 
 //commands run at the end of the frame, it is the place to put things that need to be done every frame, like a queue of tasks - Commands are executed after the game update logic runs, but before rendering occurs (in CoreStage::Update in the ECS schedule) . So if you spawn something with a command, it will be rendered without any delay. But if you want to access the spawned components, you will either need to access them after the CoreStage::Update stage (for the current frame), or wait until next frame.
 fn spawn_camera(mut commands: Commands) {
@@ -79,5 +88,5 @@ fn spawn_camera(mut commands: Commands) {
     //to get a simple pixel art look
     camera.projection.scaling_mode = ScalingMode::None;
 
-    commands.spawn_bundle(camera);
+    commands.spawn_bundle(camera).insert(MainCamera);
 }

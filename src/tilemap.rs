@@ -22,9 +22,11 @@ pub struct TileCollider;
 
 impl Plugin for TileMapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(create_simple_map)
-            .add_system_set(SystemSet::on_enter(GameState::Overworld).with_system(show_map))
-            .add_system_set(SystemSet::on_exit(GameState::Overworld).with_system(hide_map));
+        app.add_system_set(SystemSet::on_resume(GameState::Overworld).with_system(show_map))
+            .add_system_set(SystemSet::on_pause(GameState::Overworld).with_system(hide_map))
+            .add_system_set(
+                SystemSet::on_enter(GameState::Overworld).with_system(create_simple_map),
+            );
     }
 }
 
