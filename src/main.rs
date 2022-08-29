@@ -31,6 +31,9 @@ use graphics::GraphicsPlugin;
 mod start_menu;
 use start_menu::MainMenuPlugin;
 
+mod npc;
+use npc::NpcPlugin;
+
 pub const CLEAR: Color = Color::rgb(0.1, 0.1, 0.1);
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const TILE_SIZE: f32 = 0.1;
@@ -68,6 +71,7 @@ fn main() {
         .add_plugin(BattlePlugin)
         .add_plugin(FadeoutPlugin)
         .add_plugin(AsciiPlugin)
+        .add_plugin(NpcPlugin)
         .add_plugin(DebugPlugin)
         .add_plugin(MainMenuPlugin)
         .add_plugin(TileMapPlugin)

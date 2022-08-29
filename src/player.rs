@@ -22,7 +22,7 @@ pub struct EncounterTracker {
 #[derive(Component, Inspectable)]
 pub struct Player {
     speed: f32,
-    active: bool,
+    pub active: bool,
     just_moved: bool,
     pub exp: usize,
 }
