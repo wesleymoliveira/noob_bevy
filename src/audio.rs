@@ -97,6 +97,7 @@ fn start_battle_music(
     audio_state: Res<AudioState>,
 ) {
     background.pause();
+    battle.stop();
     battle.play(audio_state.battle_handle.clone()).looped();
 }
 
