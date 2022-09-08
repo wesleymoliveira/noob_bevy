@@ -30,7 +30,9 @@ impl Plugin for GameAudioPlugin {
             .add_audio_channel::<BattleChannel>()
             .add_audio_channel::<SfxChannel>()
             .add_system_set(SystemSet::on_enter(GameState::Battle).with_system(start_battle_music))
-            .add_system_set(SystemSet::on_enter(GameState::Overworld).with_system(resume_bgm_music))
+            .add_system_set(
+                SystemSet::on_resume(GameState::Overworld).with_system(resume_bgm_music),
+            )
             .add_system_set(SystemSet::on_enter(BattleState::Reward).with_system(play_reward_sfx))
             .add_system(play_hit_sfx)
             .add_system(volume_control)
@@ -38,23 +40,13 @@ impl Plugin for GameAudioPlugin {
     }
 }
 
-fn load_audio(
-    mut commands: Commands,
-    background: Res<AudioChannel<BackgroundChannel>>,
-    battle: Res<AudioChannel<BattleChannel>>,
-    sfx: Res<AudioChannel<SfxChannel>>,
-    assets: Res<AssetServer>,
-) {
+fn load_audio(mut commands: Commands, assets: Res<AssetServer>) {
     let bgm_handle = assets.load("bip-bop.ogg");
     let battle_handle = assets.load("ganxta.ogg");
     let hit_handle = assets.load("hit.wav");
     let reward_handle = assets.load("reward.wav");
 
     let volume = 0.5;
-
-    background.set_volume(volume);
-    battle.set_volume(volume);
-    sfx.set_volume(volume);
 
     commands.insert_resource(AudioState {
         bgm_handle: bgm_handle,
