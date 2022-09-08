@@ -3,9 +3,10 @@ use bevy_inspector_egui::Inspectable;
 
 //use TILE_SIZE to adjust the movement to be relative to it
 use crate::{
-    ascii::{spawn_ascii_sprite, AsciiSpriteSheet},
+    ascii::AsciiSpriteSheet,
     battle::BattleStats,
     fadeout::create_fadeout,
+    graphics::{CharacterSheet, FacingDirection, FrameAnimation, PlayerGraphics},
     tilemap::{EncounterSpawner, TileCollider},
     GameState, MainCamera, TILE_SIZE,
 };
@@ -116,12 +117,12 @@ fn player_movement(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
     //a query is a system fn param we use to look up groups of entities. On this situation we want to look up all the entities with the Player component
-    mut player_query: Query<(&mut Player, &mut Transform)>,
+    mut player_query: Query<(&mut Player, &mut Transform, &mut PlayerGraphics)>,
     //query for tiles with colliders. The Player can have a collision with these tiles, then it could match two queries, it's the reason we are using Without<Player>
     wall_query: Query<&Transform, (With<TileCollider>, Without<Player>)>,
 ) {
     //as we have only one player it works fine, but if it returns more than one player, or zero we will have a problem
-    let (mut player, mut transform) = player_query.single_mut();
+    let (mut player, mut transform, mut graphics) = player_query.single_mut();
     player.just_moved = false;
 
     if !player.active {
@@ -154,6 +155,11 @@ fn player_movement(
     {
         if x_delta != 0.0 {
             player.just_moved = true;
+            if x_delta > 0.0 {
+                graphics.facing = FacingDirection::Right;
+            } else {
+                graphics.facing = FacingDirection::Left;
+            }
         }
         transform.translation = target;
     }
@@ -165,6 +171,11 @@ fn player_movement(
     {
         if y_delta != 0.0 {
             player.just_moved = true;
+            if y_delta > 0.0 {
+                graphics.facing = FacingDirection::Up;
+            } else {
+                graphics.facing = FacingDirection::Down;
+            }
         }
         transform.translation = target;
     }
@@ -183,19 +194,27 @@ fn wall_collision_check(target_player_pos: Vec3, wall_translation: Vec3) -> bool
 fn spawn_player(
     //commands as I expect to spawn an entitie
     mut commands: Commands,
-    ascii: Res<AsciiSpriteSheet>,
+    characters: Res<CharacterSheet>,
 ) {
-    let player = spawn_ascii_sprite(
-        &mut commands,
-        &ascii,
-        1,
-        Color::rgb(0.3, 0.3, 0.9),
-        Vec3::new(2.0 * TILE_SIZE, -2.0 * TILE_SIZE, 900.0),
-        Vec3::splat(1.0),
-    );
-
     commands
-        .entity(player)
+        .spawn_bundle(SpriteSheetBundle {
+            sprite: TextureAtlasSprite {
+                index: characters.player_down[0],
+                custom_size: Some(Vec2::splat(TILE_SIZE)),
+                ..default()
+            },
+            transform: Transform::from_xyz(2.0 * TILE_SIZE, -2.0 * TILE_SIZE, 900.0),
+            texture_atlas: characters.handle.clone(),
+            ..default()
+        })
+        .insert(FrameAnimation {
+            timer: Timer::from_seconds(0.2, true),
+            frames: characters.player_down.to_vec(),
+            current_frame: 0,
+        })
+        .insert(PlayerGraphics {
+            facing: FacingDirection::Down,
+        })
         .insert(Name::from("Player"))
         .insert(Player {
             speed: 3.0,
@@ -212,19 +231,4 @@ fn spawn_player(
         .insert(EncounterTracker {
             timer: Timer::from_seconds(2.0, true),
         });
-    //.id(); //id() gives back the entity after creation
-
-    let background = spawn_ascii_sprite(
-        &mut commands,
-        &ascii,
-        0,
-        Color::rgb(0.5, 0.5, 0.5),
-        Vec3::new(0.0, 0.0, -1.0),
-        Vec3::splat(1.0),
-    );
-
-    commands.entity(background).insert(Name::new("Background"));
-    //.id(); //id() gives back the entity after creation
-
-    commands.entity(player).push_children(&[background]);
 }
