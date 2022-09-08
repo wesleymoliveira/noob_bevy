@@ -28,6 +28,21 @@ pub struct Player {
     pub exp: usize,
 }
 
+impl Player {
+    pub fn give_exp(&mut self, exp: usize, stats: &mut BattleStats) -> bool {
+        self.exp += exp;
+        if self.exp >= 50 {
+            stats.health += 2;
+            stats.max_health += 2;
+            stats.attack += 1;
+            stats.defense += 1;
+            self.exp -= 50;
+            return true;
+        }
+        false
+    }
+}
+
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(SystemSet::on_resume(GameState::Overworld).with_system(show_player))
